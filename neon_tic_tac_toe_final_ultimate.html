@@ -1,0 +1,342 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Neon Tic Tac Toe</title>
+  <style>
+    @keyframes pulse {
+      0% { box-shadow: 0 0 5px #0ff; }
+      50% { box-shadow: 0 0 20px #0ff, 0 0 30px #0ff; }
+      100% { box-shadow: 0 0 5px #0ff; }
+    }
+    @keyframes glow {
+      0% { text-shadow: 0 0 5px #0ff; }
+      50% { text-shadow: 0 0 20px #0ff; }
+      100% { text-shadow: 0 0 5px #0ff; }
+    }
+    
+    body {
+    background: linear-gradient(270deg, #0f0c29, #302b63, #24243e);
+    background-size: 600% 600%;
+    animation: gradientBG 15s ease infinite;
+    
+      background: #000;
+      font-family: 'Arial', sans-serif;
+      color: #0ff;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      margin: 0;
+    }
+    .container {
+      text-align: center;
+      max-width: 500px;
+    }
+    h1 {
+  animation: glow 1.5s infinite;
+      font-size: 2em;
+      text-shadow: 0 0 15px #0ff;
+    }
+    .menu, .board, .room, .status, .reset, .theme-toggle {
+      margin-top: 15px;
+    }
+    button, input {
+  box-shadow: 0 0 10px #0ff;
+  animation: pulse 3s infinite;
+      margin: 5px;
+      padding: 10px;
+      font-size: 16px;
+      border: none;
+      border-radius: 5px;
+      background: #0ff;
+      color: #000;
+      cursor: pointer;
+      transition: 0.3s;
+    }
+    button:hover {
+      background: #0cc;
+    }
+    input {
+      width: 70%;
+    }
+    .board {
+      display: grid;
+      grid-template-columns: repeat(3, 100px);
+      gap: 10px;
+      justify-content: center;
+      margin: auto;
+    }
+    .cell {
+  animation: pulse 2s infinite;
+      width: 100px;
+      height: 100px;
+      background: #111;
+      border: 2px solid #0ff;
+      font-size: 2em;
+      color: #0ff;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      cursor: pointer;
+      box-shadow: 0 0 15px #0ff;
+    }
+    .cell.win {
+      background: #0f0;
+      color: #000;
+    }
+    .dark-mode {
+      background: #000;
+      color: #0ff;
+    }
+    .light-mode {
+      background: #f9f9f9;
+      color: #000;
+    }
+    .light-mode .cell {
+  animation: pulse 2s infinite;
+      background: #fff;
+      color: #000;
+      border-color: #000;
+    }
+    .light-mode .cell.win {
+      background: #0f0;
+      color: #000;
+    }
+  @keyframes gradientBG {
+      0% {background-position: 0% 50%;}
+      50% {background-position: 100% 50%;}
+      100% {background-position: 0% 50%;}
+    }
+
+canvas {
+  position: fixed;
+  top: 0; left: 0;
+  z-index: -1;
+}
+@keyframes gradientBG {
+  0% {background-position: 0% 50%;}
+  50% {background-position: 100% 50%;}
+  100% {background-position: 0% 50%;}
+}
+</style>
+</head>
+<body class="dark-mode">
+  <div class="container">
+    <h1>🎮 Neon Tic Tac Toe</h1>
+    <div class="theme-toggle">
+      <button onclick="toggleTheme()">🌓 Toggle Theme</button>
+      <button onclick="toggleSound()">🔊 Sound: On</button>
+    </div>
+    <div class="menu">
+      <button onclick="startGame('AI')">Play vs AI</button>
+      <button onclick="startGame('Local')">2 Player</button>
+    </div>
+    <div class="room">
+      <input type="text" id="roomCode" placeholder="Room Code">
+      <button onclick="createRoom()">Create Room</button>
+      <button onclick="joinRoom()">Join Room</button>
+    </div>
+    <div class="status" id="status">Select mode to start</div>
+    <div class="board" id="board" style="display: none;">
+      <div class="cell" data-cell></div>
+      <div class="cell" data-cell></div>
+      <div class="cell" data-cell></div>
+      <div class="cell" data-cell></div>
+      <div class="cell" data-cell></div>
+      <div class="cell" data-cell></div>
+      <div class="cell" data-cell></div>
+      <div class="cell" data-cell></div>
+      <div class="cell" data-cell></div>
+    </div>
+    <button onclick="resetGame()" class="reset" style="display:none;">🔄 Reset</button>
+  </div>
+
+  <!-- Firebase -->
+  <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore-compat.js"></script>
+
+  <script>
+    const firebaseConfig = {
+      apiKey: "AIzaSyAdqSDOKkLCZUBee_F2Uz_XiWKr9Ab_UMk",
+      authDomain: "instafil-cfd15.firebaseapp.com",
+      databaseURL: "https://instafil-cfd15-default-rtdb.asia-southeast1.firebasedatabase.app",
+      projectId: "instafil-cfd15",
+      storageBucket: "instafil-cfd15.firebasestorage.app",
+      messagingSenderId: "78507610535",
+      appId: "1:78507610535:web:e173f3a5139de60c762682",
+      measurementId: "G-KZV2YRL0XX"
+    };
+    firebase.initializeApp(firebaseConfig);
+console.log("Firebase initialized");
+    const db = firebase.firestore();
+
+    let mode = "", player = "X", board = Array(9).fill(""), roomID = "", isMyTurn = true, cells;
+    let soundOn = true;
+    const winSound = new Audio("https://actions.google.com/sounds/v1/cartoon/clang_and_wobble.ogg");
+    const moveSound = new Audio("https://actions.google.com/sounds/v1/cartoon/wood_plank_flicks.ogg");
+
+    document.addEventListener("DOMContentLoaded", () => {
+      cells = document.querySelectorAll('[data-cell]');
+      cells.forEach((cell, idx) => cell.addEventListener('click', () => handleMove(idx)));
+    });
+
+    function startGame(selectedMode) {
+      mode = selectedMode;
+      board = Array(9).fill("");
+      updateBoard();
+      document.getElementById("status").innerText = `Mode: ${mode}`;
+      document.getElementById("board").style.display = "grid";
+      document.querySelector(".reset").style.display = "inline-block";
+    }
+
+    function toggleTheme() {
+      document.body.classList.toggle("light-mode");
+      document.body.classList.toggle("dark-mode");
+    }
+
+    function toggleSound() {
+      soundOn = !soundOn;
+      document.querySelectorAll(".theme-toggle button")[1].innerText = soundOn ? "🔊 Sound: On" : "🔇 Sound: Off";
+    }
+
+    function handleMove(idx) {
+      if (board[idx]) return;
+      if (mode === "AI" && !isMyTurn) return;
+      board[idx] = player;
+      playSound(moveSound);
+      updateBoard();
+      if (checkWin()) return;
+      if (mode === "AI") {
+        isMyTurn = false;
+        setTimeout(() => {
+          const aiMove = getBestMove();
+          board[aiMove] = "O";
+          playSound(moveSound);
+          updateBoard();
+          checkWin();
+          isMyTurn = true;
+        }, 500);
+      } else if (mode === "Local") {
+        player = player === "X" ? "O" : "X";
+        document.getElementById("status").innerText = `Turn: ${player}`;
+      }
+    }
+
+    function updateBoard() {
+      cells.forEach((cell, i) => {
+        cell.textContent = board[i];
+        cell.classList.remove("win");
+      });
+    }
+
+    function checkWin() {
+      const wins = [
+        [0,1,2],[3,4,5],[6,7,8],
+        [0,3,6],[1,4,7],[2,5,8],
+        [0,4,8],[2,4,6]
+      ];
+      for (let combo of wins) {
+        const [a,b,c] = combo;
+        if (board[a] && board[a] === board[b] && board[b] === board[c]) {
+          [a,b,c].forEach(i => cells[i].classList.add("win"));
+          document.getElementById("status").innerText = `${board[a]} wins!`;
+          playSound(winSound);
+          return true;
+        }
+      }
+      if (!board.includes("")) {
+        document.getElementById("status").innerText = "It's a tie!";
+        return true;
+      }
+      return false;
+    }
+
+    function getBestMove() {
+      const empty = board.map((val, i) => val ? null : i).filter(v => v !== null);
+      return empty[Math.floor(Math.random() * empty.length)];
+    }
+
+    function resetGame() {
+      board = Array(9).fill("");
+      player = "X";
+      updateBoard();
+      document.getElementById("status").innerText = `Mode: ${mode}`;
+    }
+
+    function playSound(sound) {
+      if (soundOn) sound.play();
+    }
+
+    function createRoom() {
+      roomID = Math.random().toString(36).substring(2, 8);
+      document.getElementById("roomCode").value = roomID;
+      db.collection("rooms").doc(roomID).set({ board: Array(9).fill(""), turn: "X", players: 1 })
+.then(() => console.log("Room created:", roomID))
+.catch(err => console.error("Room create failed", err));
+      listenToRoom(true);
+    }
+
+    function joinRoom() {
+      roomID = document.getElementById("roomCode").value.trim();
+      if (!roomID) return;
+      const ref = db.collection("rooms").doc(roomID);
+      ref.get().then(doc => {
+console.log("Join room attempt:", roomID);
+        if (!doc.exists) return alert("Room not found");
+        if (doc.data().players >= 2) return alert("Room full");
+        ref.update({ players: 2 }).then(() => console.log("Joined room successfully")).catch(err => console.error("Join failed", err));
+        listenToRoom(false);
+      });
+    }
+
+    function listenToRoom(isCreator) {
+      mode = "Online";
+      isMyTurn = isCreator;
+      document.getElementById("status").innerText = "Connected to Room: " + roomID;
+      document.getElementById("board").style.display = "grid";
+      document.querySelector(".reset").style.display = "inline-block";
+      db.collection("rooms").doc(roomID).onSnapshot(doc => {
+console.log("Received Firestore update", doc.data());
+        const data = doc.data();
+        board = data.board;
+        player = data.turn;
+        updateBoard();
+        if (checkWin()) return;
+        isMyTurn = (data.turn === (isCreator ? "X" : "O"));
+      });
+    }
+  </script>
+<script>
+const canvas = document.getElementById('bubbles');
+const ctx = canvas.getContext('2d');
+canvas.width = window.innerWidth;
+canvas.height = window.innerHeight;
+const bubbles = Array.from({ length: 50 }, () => ({
+  x: Math.random() * canvas.width,
+  y: Math.random() * canvas.height,
+  r: Math.random() * 4 + 1,
+  d: Math.random() * 2
+}));
+function drawBubbles() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.fillStyle = "rgba(0, 255, 255, 0.5)";
+  bubbles.forEach(b => {
+    ctx.beginPath();
+    ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2);
+    ctx.fill();
+    b.y -= b.d;
+    if (b.y < 0) {
+      b.y = canvas.height;
+      b.x = Math.random() * canvas.width;
+    }
+  });
+  requestAnimationFrame(drawBubbles);
+}
+drawBubbles();
+</script>
+</body>
+</html>
